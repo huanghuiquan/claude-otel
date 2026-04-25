@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CLAUDE · TRACE</title>
+<title>claude-otel</title>
 <script>
   try{ var _t = localStorage.getItem('claude-otel-theme'); if(_t==='light'||_t==='dark') document.documentElement.setAttribute('data-theme', _t); }catch(e){}
 </script>
@@ -27,6 +27,11 @@
     --green:#3a7a4a;
     --violet:#6f5fb8;
     --tool:#a05a2c;
+    --surface-tint:rgba(0,0,0,.04);
+    --surface-tint-2:rgba(0,0,0,.06);
+    --accent-tint:rgba(168,118,24,.08);
+    --accent-tint-strong:rgba(168,118,24,.14);
+    --warn-tint:rgba(192,57,43,.10);
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -46,6 +51,11 @@
       --green:#82c982;
       --violet:#b39fdc;
       --tool:#d49060;
+      --surface-tint:rgba(255,255,255,.03);
+      --surface-tint-2:rgba(255,255,255,.05);
+      --accent-tint:rgba(216,161,74,.07);
+      --accent-tint-strong:rgba(216,161,74,.12);
+      --warn-tint:rgba(224,112,96,.10);
     }
   }
   :root[data-theme="dark"]{
@@ -244,9 +254,9 @@
     transition:background .15s,border-color .15s;
     position:relative;
   }
-  .turn-item:hover{background:rgba(200,146,54,.05)}
+  .turn-item:hover{background:var(--accent-tint)}
   .turn-item.active{
-    background:rgba(200,146,54,.09);
+    background:var(--accent-tint-strong);
     border-left-color:var(--amber);
   }
   .turn-item.active .ti-num{color:var(--amber)}
@@ -558,7 +568,7 @@
   /* ──────── XML / TAG BLOCKS ──────── */
   .tagblock{
     margin:6px 0;border-left:2px solid var(--rule-bright);
-    background:rgba(255,255,255,.025);
+    background:var(--surface-tint);
   }
   .tagblock summary{
     list-style:none;cursor:pointer;
@@ -566,7 +576,7 @@
     padding:5px 10px;
     transition:background .15s;
   }
-  .tagblock summary:hover{background:rgba(255,255,255,.025)}
+  .tagblock summary:hover{background:var(--surface-tint)}
   .tagblock summary::-webkit-details-marker{display:none}
   .tg-caret{
     font-size:8px;width:8px;color:var(--paper-mute);
@@ -590,7 +600,7 @@
     padding:8px 14px 10px;
     border-top:1px dashed var(--rule);
   }
-  .tagblock.kc-warn{border-left-color:var(--red);background:rgba(196,104,80,.09)}
+  .tagblock.kc-warn{border-left-color:var(--red);background:var(--warn-tint)}
   .tagblock.kc-warn .tg-name{color:var(--red)}
   .tagblock.kc-sys{border-left-color:var(--amber-soft)}
   .tagblock.kc-sys .tg-name{color:var(--amber)}
@@ -641,7 +651,7 @@
     transition:background .15s,padding-left .15s;
   }
   .picker-card:hover{
-    background:rgba(200,146,54,.05);
+    background:var(--accent-tint);
     padding-left:14px;
   }
   .picker-card:hover .pc-name{color:var(--amber)}
@@ -720,7 +730,7 @@
   /* prior-context history block */
   .history-block{
     margin:14px 0 18px;border:1px dashed var(--rule-bright);
-    background:rgba(255,255,255,.025);
+    background:var(--surface-tint);
   }
   .history-block > summary{
     list-style:none;cursor:pointer;
@@ -729,7 +739,7 @@
     color:var(--paper-dim);
     transition:background .15s;
   }
-  .history-block > summary:hover{background:rgba(255,255,255,.04);color:var(--paper)}
+  .history-block > summary:hover{background:var(--surface-tint-2);color:var(--paper)}
   .history-block > summary::-webkit-details-marker{display:none}
   .history-block > summary .h-caret{font-size:8px;color:var(--paper-mute);transition:transform .15s}
   .history-block[open] > summary .h-caret{transform:rotate(90deg)}
@@ -1613,7 +1623,7 @@ dz.addEventListener('drop', async e=>{
 });
 
 /* ───────────────── SERVER MODE ─────────────────
- * When served by the `scry` local server, we fetch sessions/files via HTTP
+ * When served by the `claude-otel` local server, we fetch sessions/files via HTTP
  * instead of using the file picker. Live updates via SSE.
  */
 async function detectMode(){
@@ -1628,13 +1638,12 @@ async function detectMode(){
 function pairTurns(reqs, resps){
   reqs.sort((a,b)=>a.ts-b.ts);
   resps.sort((a,b)=>a.ts-b.ts);
-  const used = new Set();
-  const turns = reqs.map(r=>{
-    const i = resps.findIndex((x,j)=>!used.has(j) && x.ts >= r.ts - 50);
-    if(i>=0){ used.add(i); return {req:r, resp:resps[i]}; }
-    return {req:r, resp:null};
-  });
-  resps.forEach((r,i)=>{ if(!used.has(i)) turns.push({req:null, resp:r}); });
+  // Pair by sorted index; tail stragglers get a null counterpart.
+  const turns = [];
+  const n = Math.max(reqs.length, resps.length);
+  for(let i=0; i<n; i++){
+    turns.push({ req: reqs[i] || null, resp: resps[i] || null });
+  }
   return turns;
 }
 
@@ -1642,12 +1651,18 @@ async function fetchSessionData(slug){
   const u = encodeURIComponent(slug);
   const manifest = await (await fetch(`/api/sessions/${u}/files`)).json();
   const all = await Promise.all((manifest.files||[]).map(async f=>{
-    const r = await fetch(`/api/sessions/${u}/file/${encodeURIComponent(f.name)}`);
-    const body = await r.json();
-    return { file: f.name, name: f.name, path: f.name, kind: f.kind, ts: f.mtime*1000, body };
+    try{
+      const r = await fetch(`/api/sessions/${u}/file/${encodeURIComponent(f.name)}`);
+      if(!r.ok) return null;
+      const body = await r.json();
+      return { file: f.name, name: f.name, path: f.name, kind: f.kind, ts: f.mtime*1000, body };
+    }catch(e){
+      return null;  // partial write, malformed JSON, etc. — skip this file
+    }
   }));
-  const reqs = all.filter(x=>x.kind==='request');
-  const resps = all.filter(x=>x.kind==='response');
+  const ok = all.filter(Boolean);
+  const reqs = ok.filter(x=>x.kind==='request');
+  const resps = ok.filter(x=>x.kind==='response');
   const sessionName = manifest.session || slug;
   const project = manifest.project || null;
   const projectPath = manifest.projectPath || null;
@@ -1663,15 +1678,24 @@ let _sse = null;
 function stopSSE(){ if(_sse){ _sse.close(); _sse = null; } }
 function startSSE(name){
   stopSSE();
+  let inflight = false, pending = false;
+  async function refresh(){
+    if(inflight){ pending = true; return; }
+    inflight = true;
+    try{
+      const data = await fetchSessionData(name);
+      S.data = data;
+      renderHeader(); renderSidebar(); renderDoc();
+    }catch(e){ /* keep prior data on transient errors */ }
+    inflight = false;
+    if(pending){ pending = false; refresh(); }
+  }
   try{
     _sse = new EventSource(`/api/sessions/${encodeURIComponent(name)}/events`);
-    _sse.onmessage = async ev => {
+    _sse.onmessage = ev => {
       try{
         const d = JSON.parse(ev.data);
-        if(d.changed && d.changed.length){
-          S.data = await fetchSessionData(name);
-          renderHeader(); renderSidebar(); renderDoc();
-        }
+        if(d.changed && d.changed.length) refresh();
       }catch(e){}
     };
     _sse.onerror = ()=>{ /* auto-reconnect handled by browser */ };
@@ -1785,7 +1809,8 @@ async function bootServer(){
       reload.textContent = '◂ All sessions';
       reload.onclick = async ()=> renderSessionPicker(await refreshSessionList());
     }
-    const hashId = decodeURIComponent(location.hash.replace(/^#/,''));
+    let hashId = '';
+    try{ hashId = decodeURIComponent(location.hash.replace(/^#/,'')); } catch(e){ /* malformed % */ }
     const target = hashId && sessions.find(s=>s.id===hashId || s.name===hashId);
     if(target) loadServerSession(target.id);
     else renderSessionPicker(sessions);

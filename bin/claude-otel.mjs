@@ -72,9 +72,11 @@ function findViewerHtml(scriptPath, override) {
 }
 
 function safeJoin(base, name) {
+  if (typeof name !== 'string' || name === '' || name === '.' || name.includes('\0')) return null;
   const baseR = path.resolve(base);
   const target = path.resolve(baseR, name);
-  if (target !== baseR && !target.startsWith(baseR + path.sep)) return null;
+  if (target === baseR) return null;
+  if (!target.startsWith(baseR + path.sep)) return null;
   return target;
 }
 
@@ -93,17 +95,22 @@ function readProjectPath(projectDir) {
   catch { return null; }
 }
 
-function dirHasJsonFiles(dir) {
+function dirHasSessionFiles(dir) {
   try {
     for (const n of fs.readdirSync(dir)) {
-      if (n.endsWith('.json') && fs.statSync(path.join(dir, n)).isFile()) return true;
+      if ((n.endsWith('.request.json') || n.endsWith('.response.json'))
+          && fs.statSync(path.join(dir, n)).isFile()) return true;
     }
   } catch { /* nope */ }
   return false;
 }
 
+// Slug shape: "<encodedProject>/<session>" or just "<session>" (legacy).
+// `encodeProject` collapses path separators to `-`, so the encoded form
+// never contains `/`. Session names are timestamps, also `/`-free. The
+// first `/` therefore unambiguously separates the two halves.
 function parseSlug(slug) {
-  const idx = slug.indexOf(':');
+  const idx = slug.indexOf('/');
   if (idx < 0) return { project: null, session: slug };
   return { project: slug.slice(0, idx), session: slug.slice(idx + 1) };
 }
@@ -140,7 +147,7 @@ function summarizeSessionDir(sessionDir, project, projectPath, sessionName) {
   const resps = files.filter(f => f.kind === 'response').length;
   if (!reqs && !resps) return null;
   const mtimes = files.map(f => f.mtime);
-  const id = project ? `${project}:${sessionName}` : sessionName;
+  const id = project ? `${project}/${sessionName}` : sessionName;
   return {
     id,
     project,
@@ -167,7 +174,7 @@ function listSessions(root) {
     try { st = fs.statSync(d); } catch { continue; }
     if (!st.isDirectory()) continue;
 
-    if (dirHasJsonFiles(d)) {
+    if (dirHasSessionFiles(d)) {
       // legacy: session directly under root, no project layer
       const sess = summarizeSessionDir(d, null, null, name);
       if (sess) out.push(sess);
@@ -207,7 +214,7 @@ function handle(req, res, ctx) {
   const u = new URL(req.url, 'http://localhost');
   const p = u.pathname;
 
-  if (p === '/' || p === '/index.html')  return sendBytes(res, 200, 'text/html; charset=utf-8', ctx.htmlBytes);
+  if (p === '/' || p === '/index.html')  return sendBytes(res, 200, 'text/html; charset=utf-8', ctx.getHtml());
   if (p === '/api/health')                return sendJson(res, 200, { ok: true, root: ctx.root, version: VERSION });
   if (p === '/api/sessions')              return sendJson(res, 200, listSessions(ctx.root));
 
@@ -314,8 +321,15 @@ async function cmdView(opts, positional) {
     console.error('  pass --html /path/to/viewer.html');
     process.exit(1);
   }
-  const htmlBytes = await fsp.readFile(html);
-  const server = http.createServer((req, res) => handle(req, res, { root, htmlBytes }));
+  // Re-read viewer.html on each request so live edits show up without
+  // restarting the server. The file is tiny (≈70 KB) and the OS page
+  // cache makes this effectively free.
+  let cached = await fsp.readFile(html);
+  const getHtml = () => {
+    try { cached = fs.readFileSync(html); } catch { /* keep last good copy */ }
+    return cached;
+  };
+  const server = http.createServer((req, res) => handle(req, res, { root, getHtml }));
   server.on('error', err => { console.error(`${PKG}: ${err.message}`); process.exit(1); });
   server.listen(port, host, () => {
     const url = `http://${host}:${port}`;
@@ -353,9 +367,17 @@ async function cmdRecord(opts, claudeArgs) {
     env.OTEL_LOGS_EXPORT_INTERVAL = '1000';
   }
 
-  const bin = opts.cmd || 'claude';
-  const child = spawn(bin, claudeArgs, { stdio: 'inherit', env });
-  child.on('exit', code => process.exit(code ?? 0));
+  // --cmd may be a multi-word string like "mise exec claude"; split on
+  // whitespace into bin + prefix args (no shell, so no quoting hazards).
+  const tokens = (opts.cmd || 'claude').trim().split(/\s+/).filter(Boolean);
+  const bin = tokens[0];
+  const prefixArgs = tokens.slice(1);
+  const allArgs = [...prefixArgs, ...claudeArgs];
+  const child = spawn(bin, allArgs, { stdio: 'inherit', env });
+  child.on('exit', (code, signal) => {
+    if (signal) process.exit(128 + (os.constants.signals[signal] || 0));
+    process.exit(code ?? 1);
+  });
   child.on('error', err => {
     console.error(`${PKG}: failed to exec ${bin}: ${err.message}`);
     console.error(`  hint: ensure \`${bin}\` is installed and on your $PATH.`);
@@ -364,15 +386,21 @@ async function cmdRecord(opts, claudeArgs) {
 }
 
 // ─────────────── arg parsing ───────────────
+function take(flag, argv, i) {
+  const v = argv[i];
+  if (v === undefined) { console.error(`${PKG}: ${flag} requires a value`); process.exit(2); }
+  return v;
+}
+
 function parseViewArgs(argv) {
   const opts = {};
   const positional = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--no-open')                          opts.noOpen = true;
-    else if (a === '--port')                         opts.port = argv[++i];
-    else if (a === '--host')                         opts.host = argv[++i];
-    else if (a === '--html')                         opts.html = argv[++i];
+    else if (a === '--port')                         opts.port = take(a, argv, ++i);
+    else if (a === '--host')                         opts.host = take(a, argv, ++i);
+    else if (a === '--html')                         opts.html = take(a, argv, ++i);
     else if (a === '--help' || a === '-h')           { console.log(HELP); process.exit(0); }
     else if (a === '--version' || a === '-v')        { console.log(`${PKG} ${VERSION}`); process.exit(0); }
     else if (a.startsWith('-'))                      { console.error(`${PKG}: unknown flag: ${a}`); process.exit(2); }
@@ -388,9 +416,9 @@ function parseRecordArgs(argv) {
   while (i < argv.length) {
     const a = argv[i];
     if (a === '--')                                  { i++; break; }
-    else if (a === '--root')                         { opts.root = argv[++i]; i++; }
+    else if (a === '--root')                         { opts.root = take(a, argv, ++i); i++; }
     else if (a === '--events')                       { opts.events = true; i++; }
-    else if (a === '--cmd')                          { opts.cmd = argv[++i]; i++; }
+    else if (a === '--cmd')                          { opts.cmd = take(a, argv, ++i); i++; }
     else if (a === '--help')                         { console.log(HELP); process.exit(0); }
     else                                             { break; }                    // first non-option → spawn args
   }
@@ -400,6 +428,11 @@ function parseRecordArgs(argv) {
 
 // ─────────────── main ───────────────
 function main() {
+  const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
+  if (!Number.isFinite(nodeMajor) || nodeMajor < 18) {
+    console.error(`${PKG}: requires Node.js >= 18 (current: ${process.versions.node})`);
+    process.exit(1);
+  }
   const argv = process.argv.slice(2);
   if (argv[0] === '--help' || argv[0] === '-h')      { console.log(HELP); return; }
   if (argv[0] === '--version' || argv[0] === '-v')   { console.log(`${PKG} ${VERSION}`); return; }

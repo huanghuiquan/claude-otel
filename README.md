@@ -13,11 +13,11 @@ Claude Code v2.x ships as a native binary, which broke older interceptors like `
 
 ```bash
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
-export OTEL_LOG_RAW_API_BODIES=file:~/.claude/claude-otel/$(date +%F_%H-%M-%S)
+export OTEL_LOG_RAW_API_BODIES=file:/path/to/dump-dir
 claude
 ```
 
-`claude-otel` automates that capture, organises sessions by project, and renders the resulting JSONs as a real conversation — markdown, tool calls, prior context, raw inspection — served locally with live updates over SSE.
+`claude-otel` automates that capture (defaults to `~/.claude/claude-otel/<encoded-cwd>/<timestamp>/`, so sessions are grouped by project) and renders the resulting JSONs as a real conversation — markdown, tool calls, prior context, raw inspection — served locally with live updates over SSE.
 
 ## Install
 
