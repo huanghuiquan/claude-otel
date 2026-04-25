@@ -1,0 +1,26 @@
+# OTel log dirs (testing)
+.claude-otel/
+*.claude-otel/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node (future npm wrapper)
+node_modules/
+package-lock.json
+
+# Logs
+*.log

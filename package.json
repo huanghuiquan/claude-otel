@@ -1,0 +1,46 @@
+{
+  "name": "claude-scry",
+  "version": "0.1.0",
+  "description": "Local viewer for Claude Code OpenTelemetry raw API bodies",
+  "bin": {
+    "scry": "./bin/scry",
+    "claude-log": "./bin/claude-log"
+  },
+  "files": [
+    "bin/",
+    "viewer.html",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "./bin/scry"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "ai",
+    "opentelemetry",
+    "otel",
+    "viewer",
+    "trace",
+    "logs",
+    "cli"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/USER/claude-scry.git"
+  },
+  "homepage": "https://github.com/USER/claude-scry#readme",
+  "bugs": {
+    "url": "https://github.com/USER/claude-scry/issues"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ]
+}

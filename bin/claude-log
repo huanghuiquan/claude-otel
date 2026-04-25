@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+LOG_ROOT="${CLAUDE_LOG_ROOT:-$PWD/.claude-otel}"
+TS="$(date +%Y-%m-%d-%H-%M-%S)"
+LOG_DIR="$LOG_ROOT/$TS"
+mkdir -p "$LOG_DIR"
+
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_LOG_RAW_API_BODIES="file:$LOG_DIR"
+export OTEL_LOG_USER_PROMPTS=1
+export OTEL_LOG_TOOL_CONTENT=1
+export OTEL_LOG_TOOL_DETAILS=1
+
+if [[ "${CLAUDE_LOG_EVENTS:-0}" == "1" ]]; then
+  export OTEL_LOGS_EXPORTER=console
+  export OTEL_LOGS_EXPORT_INTERVAL=1000
+fi
+
+printf 'API bodies will be written to: %s\n' "$LOG_DIR" >&2
+
+exec claude "$@"
