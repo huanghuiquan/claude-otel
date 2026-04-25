@@ -4,28 +4,67 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CLAUDE · TRACE</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400;1,500&display=swap" rel="stylesheet">
+<script>
+  try{ var _t = localStorage.getItem('claude-otel-theme'); if(_t==='light'||_t==='dark') document.documentElement.setAttribute('data-theme', _t); }catch(e){}
+</script>
 <style>
   :root{
-    /* warm-dark — calm, low-contrast, single accent */
-    --ink:#1f1c18;
-    --ink-2:#262320;
-    --ink-3:#2e2a25;
-    --paper:#cdc3a8;
-    --paper-2:#a89f86;
-    --paper-dim:#8c836b;
-    --paper-mute:#615a48;
-    --rule:#2e2a24;
-    --rule-bright:#473f30;
-    --amber:#c89236;
-    --amber-soft:#a87618;
-    --cyan:#5da39e;
-    --red:#c46850;
-    --green:#7ea36e;
-    --violet:#9f8bc4;
-    --tool:#c08056;
+    color-scheme: light dark;
+    /* paper-light — neutral grays, amber stays as brand anchor */
+    --ink:#fafaf7;
+    --ink-2:#ffffff;
+    --ink-3:#f1eee6;
+    --paper:#1c1c1e;
+    --paper-2:#3c3c43;
+    --paper-dim:#6e6e73;
+    --paper-mute:#a1a1a6;
+    --rule:#ebe7dd;
+    --rule-bright:#d6d2c7;
+    --amber:#a87618;
+    --amber-soft:#c89236;
+    --cyan:#3478b8;
+    --red:#c0392b;
+    --green:#3a7a4a;
+    --violet:#6f5fb8;
+    --tool:#a05a2c;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#0d0d0e;
+      --ink-2:#161618;
+      --ink-3:#1f1f22;
+      --paper:#e7e7e8;
+      --paper-2:#b4b4b6;
+      --paper-dim:#8a8a8c;
+      --paper-mute:#5d5d60;
+      --rule:#222226;
+      --rule-bright:#33333a;
+      --amber:#d8a14a;
+      --amber-soft:#c89236;
+      --cyan:#5b9bd5;
+      --red:#e07060;
+      --green:#82c982;
+      --violet:#b39fdc;
+      --tool:#d49060;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#0d0d0e;
+    --ink-2:#161618;
+    --ink-3:#1f1f22;
+    --paper:#e7e7e8;
+    --paper-2:#b4b4b6;
+    --paper-dim:#8a8a8c;
+    --paper-mute:#5d5d60;
+    --rule:#222226;
+    --rule-bright:#33333a;
+    --amber:#d8a14a;
+    --amber-soft:#c89236;
+    --cyan:#5b9bd5;
+    --red:#e07060;
+    --green:#82c982;
+    --violet:#b39fdc;
+    --tool:#d49060;
   }
 
   *{box-sizing:border-box;margin:0;padding:0}
@@ -33,7 +72,7 @@
   body{
     background:var(--ink);
     color:var(--paper);
-    font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,monospace;
     font-size:12.5px;
     font-weight:400;
     line-height:1.55;
@@ -61,7 +100,7 @@
   .brand{
     display:flex;align-items:center;gap:0;
     padding:0 22px;border-right:1px solid var(--rule-bright);
-    font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;
+    font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;font-weight:500;
     font-size:30px;letter-spacing:-.018em;color:var(--paper);
     line-height:1;white-space:nowrap;
   }
@@ -70,7 +109,7 @@
     background:var(--amber);margin:0 12px 6px;
   }
   .brand .ascii{
-    font-family:'JetBrains Mono',monospace;font-style:normal;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-style:normal;
     font-size:9px;color:var(--paper-mute);letter-spacing:.22em;
     margin-left:14px;border-left:1px solid var(--rule-bright);padding-left:14px;
     line-height:1.2;
@@ -89,13 +128,13 @@
     color:var(--paper-mute);font-weight:500;
   }
   .stat-v{
-    font-family:'Instrument Serif',serif;font-style:italic;
+    font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;
     font-size:22px;line-height:1;color:var(--paper);
     letter-spacing:-.01em;
   }
   .stat-v.amber{color:var(--paper)}
   .stat-v.cyan{color:var(--paper)}
-  .stat-v small{font-size:11px;color:var(--paper-mute);font-style:normal;font-family:'JetBrains Mono';margin-left:4px;letter-spacing:.05em}
+  .stat-v small{font-size:11px;color:var(--paper-mute);font-style:normal;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-left:4px;letter-spacing:.05em}
 
   .header-actions{margin-left:auto;display:flex;align-items:center;padding:0 22px;gap:14px;border-left:1px solid var(--rule-bright)}
   .btn{
@@ -107,6 +146,7 @@
   .btn:hover{border-color:var(--amber);color:var(--amber)}
   .btn.primary{border-color:var(--amber);color:var(--amber)}
   .btn.primary:hover{background:var(--amber);color:var(--ink)}
+  .theme-btn{min-width:64px;font-feature-settings:"tnum"}
 
   /* ──────── EMPTY (DROP ZONE) ──────── */
   .empty{
@@ -130,7 +170,7 @@
     color:var(--amber);margin-bottom:18px;
   }
   .drop-title{
-    font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;
+    font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;font-weight:500;
     font-size:64px;line-height:.92;letter-spacing:-.02em;
     color:var(--paper);margin-bottom:22px;
   }
@@ -172,10 +212,15 @@
     color:var(--paper-mute);margin-bottom:6px;
   }
   .side-head .name{
-    font-family:'Instrument Serif',serif;font-style:italic;
+    font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;
     font-size:21px;color:var(--paper);line-height:1.05;
     word-break:break-all;
   }
+  .side-head .project{
+    margin-top:6px;font-size:10.5px;color:var(--paper-mute);
+    letter-spacing:.04em;word-break:break-all;
+  }
+  .side-head .project b{color:var(--paper-2);font-weight:500;margin-right:6px}
   .side-search{
     margin-top:14px;display:flex;align-items:center;gap:8px;
     border:1px solid var(--rule-bright);padding:6px 10px;
@@ -207,7 +252,7 @@
   .turn-item.active .ti-num{color:var(--amber)}
   .turn-item.hidden{display:none}
   .ti-num{
-    font-family:'Instrument Serif',serif;font-style:italic;
+    font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;
     font-size:24px;color:var(--paper-dim);line-height:1;
     align-self:start;text-align:right;letter-spacing:-.01em;
   }
@@ -299,11 +344,11 @@
     border-bottom:1px solid var(--rule-bright);
   }
   .turn-id{
-    font-family:'Instrument Serif',serif;font-style:italic;
+    font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;
     font-size:48px;line-height:.85;color:var(--amber);
     letter-spacing:-.02em;
   }
-  .turn-id-of{color:var(--paper-mute);font-size:13px;font-style:italic;margin-left:2px}
+  .turn-id-of{color:var(--paper-mute);font-size:13px;margin-left:2px}
   .turn-tag{
     font-size:9px;letter-spacing:.28em;text-transform:uppercase;
     color:var(--paper-mute);
@@ -341,7 +386,7 @@
   .block.text{word-break:break-word;color:var(--paper);font-size:12.5px;line-height:1.7}
 
   .think{
-    color:var(--paper-dim);font-style:italic;
+    color:var(--paper-dim);
     border-left:1px solid var(--violet);
     padding:4px 0 10px 16px;font-size:12px;line-height:1.65;
   }
@@ -393,7 +438,7 @@
     font-size:10.5px;color:var(--paper-mute);letter-spacing:.06em;
   }
   .tf-stat{display:flex;align-items:baseline;gap:6px}
-  .tf-stat b{font-family:'Instrument Serif',serif;font-style:italic;font-size:18px;color:var(--paper);font-weight:400;line-height:1}
+  .tf-stat b{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;font-size:18px;color:var(--paper);font-weight:400;line-height:1}
   .tf-stat .lab{font-size:8.5px;letter-spacing:.26em;text-transform:uppercase}
   .tf-stat.in b{color:var(--paper)}
   .tf-stat.out b{color:var(--paper)}
@@ -437,7 +482,7 @@
   .j-str{color:var(--paper-2)}
   .j-num{color:var(--amber)}
   .j-bool{color:var(--violet)}
-  .j-null{color:var(--paper-mute);font-style:italic}
+  .j-null{color:var(--paper-mute)}
   .j-punct{color:var(--paper-mute)}
 
   /* ──────── MARKDOWN ──────── */
@@ -446,7 +491,7 @@
   .md > :last-child{margin-bottom:0}
   .md-p{margin:.55em 0;line-height:1.7;color:var(--paper)}
   .md-h{
-    font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;
+    font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;font-weight:500;
     color:var(--paper);letter-spacing:-.01em;line-height:1.2;
     margin:1em 0 .3em;
   }
@@ -454,12 +499,12 @@
   .md-h2{font-size:24px}
   .md-h3{font-size:19px;color:var(--cyan)}
   .md-h4{
-    font-family:'JetBrains Mono';font-style:normal;font-weight:500;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-style:normal;font-weight:500;
     font-size:11px;letter-spacing:.18em;text-transform:uppercase;
     color:var(--paper-2);margin-top:1.1em;
   }
   .md-h5,.md-h6{
-    font-family:'JetBrains Mono';font-style:normal;font-weight:500;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-style:normal;font-weight:500;
     font-size:10px;letter-spacing:.22em;text-transform:uppercase;
     color:var(--paper-mute);
   }
@@ -493,13 +538,13 @@
   .md-ol li{counter-increment:n}
   .md-ol li::before{
     content:counter(n)'.';position:absolute;left:0;top:-.05em;
-    color:var(--cyan);font-family:'Instrument Serif',serif;font-style:italic;
+    color:var(--cyan);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;
     font-size:14px;
   }
   .md-q{
     margin:.6em 0;padding:.4em 0 .4em 16px;
     border-left:2px solid var(--violet);
-    color:var(--paper-dim);font-style:italic;
+    color:var(--paper-dim);
   }
   .md-a{
     color:var(--cyan);text-decoration:none;
@@ -508,7 +553,7 @@
   .md-a:hover{background:var(--cyan);color:var(--ink)}
   .md-hr{border:0;border-top:1px solid var(--rule-bright);margin:1.2em 0}
   .md strong{color:var(--paper);font-weight:700}
-  .md em{color:var(--paper-2);font-style:italic}
+  .md em{color:var(--paper-2)}
 
   /* ──────── XML / TAG BLOCKS ──────── */
   .tagblock{
@@ -532,7 +577,7 @@
     letter-spacing:.04em;font-size:9.5px;font-weight:500;flex-shrink:0;
   }
   .tg-preview{
-    color:var(--paper-mute);font-size:10.5px;font-style:italic;
+    color:var(--paper-mute);font-size:10.5px;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     flex:1;min-width:0;
   }
@@ -570,7 +615,7 @@
     color:var(--amber);margin-bottom:16px;
   }
   .picker-title{
-    font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;
+    font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;font-weight:500;
     font-size:52px;line-height:.95;letter-spacing:-.02em;
     color:var(--paper);margin-bottom:4px;
   }
@@ -602,14 +647,14 @@
   .picker-card:hover .pc-name{color:var(--amber)}
   .pc-name{
     font-size:13.5px;letter-spacing:0;color:var(--paper);
-    transition:color .15s;font-family:'JetBrains Mono',monospace;
+    transition:color .15s;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
   }
   .pc-meta{
     display:flex;align-items:baseline;gap:18px;margin-top:6px;
     font-size:10px;color:var(--paper-mute);letter-spacing:.04em;
   }
   .pc-num{
-    font-family:'Instrument Serif',serif;font-style:italic;
+    font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;
     font-size:20px;color:var(--paper);line-height:1;
     margin-right:4px;
   }
@@ -622,16 +667,37 @@
     text-align:right;
   }
   .pc-time b{
-    display:block;font-family:'Instrument Serif',serif;font-style:italic;
+    display:block;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;
     font-size:18px;color:var(--paper-2);font-weight:400;line-height:1.1;
   }
   .picker-empty{
-    padding:36px 0;color:var(--paper-mute);font-style:italic;
+    padding:36px 0;color:var(--paper-mute);
     text-align:center;font-size:12px;
   }
   .picker-empty code{
     background:var(--ink-3);padding:1px 6px;border:1px solid var(--rule);
     color:var(--amber);font-style:normal;font-size:11.5px;
+  }
+  .picker-group{padding:0 0 4px 0}
+  .picker-group + .picker-group{margin-top:14px;border-top:1px solid var(--rule-bright)}
+  .picker-group-head{
+    display:flex;align-items:baseline;gap:14px;
+    padding:14px 4px 8px;
+    color:var(--paper-2);
+    border-bottom:1px solid var(--rule);
+  }
+  .pg-label{
+    font-size:13px;font-weight:500;color:var(--paper);
+    letter-spacing:.02em;
+  }
+  .pg-path{
+    font-size:10.5px;color:var(--paper-mute);letter-spacing:.04em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    flex:1;min-width:0;
+  }
+  .pg-count{
+    font-size:9px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--paper-mute);
   }
 
   /* live indicator */
@@ -695,8 +761,8 @@
   <header>
     <div class="ticker">
       <div class="brand">
-        claud<span class="dot"></span>e
-        <span class="ascii">/&nbsp;TRACE&nbsp;//&nbsp;OTEL&nbsp;RAW&nbsp;BODIES</span>
+        claude<span class="dot"></span>otel
+        <span class="ascii">/&nbsp;TRACE&nbsp;//&nbsp;RAW&nbsp;API&nbsp;BODIES</span>
       </div>
       <div class="stats" id="stats" hidden>
         <div class="stat">
@@ -728,8 +794,9 @@
           <div class="stat-v" id="s-span">—</div>
         </div>
       </div>
-      <div class="header-actions" id="header-actions" hidden>
-        <button class="btn" id="btn-reload">Pick folder</button>
+      <div class="header-actions" id="header-actions">
+        <button class="btn" id="btn-reload" hidden>Pick folder</button>
+        <button class="btn theme-btn" id="theme-toggle" title="Cycle theme · Auto / Light / Dark">Auto</button>
       </div>
     </div>
   </header>
@@ -766,6 +833,7 @@
       <div class="side-head">
         <div class="label">SESSION</div>
         <div class="name" id="side-name">—</div>
+        <div class="project" id="side-project" hidden></div>
         <div class="side-search">
           <span style="color:var(--paper-mute);font-size:11px">⌕</span>
           <input id="filter" placeholder="filter turns…" autocomplete="off">
@@ -783,6 +851,31 @@
 
 <script>
 'use strict';
+
+/* ───────────────── THEME TOGGLE ───────────────── */
+(function(){
+  const KEY = 'claude-otel-theme';
+  const THEMES = ['auto','light','dark'];
+  function apply(t){
+    if(t==='auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', t);
+  }
+  let cur = 'auto';
+  try{ cur = localStorage.getItem(KEY) || 'auto'; }catch(e){}
+  if(!THEMES.includes(cur)) cur = 'auto';
+  apply(cur);
+  const btn = document.getElementById('theme-toggle');
+  if(btn){
+    const label = ()=>{ btn.textContent = cur[0].toUpperCase()+cur.slice(1); };
+    label();
+    btn.addEventListener('click', ()=>{
+      cur = THEMES[(THEMES.indexOf(cur)+1) % THEMES.length];
+      apply(cur);
+      try{ localStorage.setItem(KEY, cur); }catch(e){}
+      label();
+    });
+  }
+})();
 
 /* ───────────────── PRICING (rough, USD per million tokens) ─────────────────
  * Used only for an approximate cost line. Keep updated as needed.
@@ -970,6 +1063,17 @@ function makeTagBlock(tag, inner){
   return det;
 }
 
+const HTML_TAG_DENY = new Set([
+  'small','div','span','p','a','b','i','u','em','strong','code','pre','br','hr',
+  'ul','ol','li','table','tr','td','th','tbody','thead','tfoot',
+  'h1','h2','h3','h4','h5','h6',
+  'script','style','head','body','html','title','meta','link','img',
+  'input','form','button','select','option','label','textarea',
+  'section','article','header','footer','nav','aside','main',
+  'figure','figcaption','blockquote','cite','q','sub','sup','mark','del','ins',
+  'details','summary','video','audio','iframe','svg','path','g','rect','circle','line','polyline','polygon',
+]);
+
 function taggedRender(text){
   const frag = document.createDocumentFragment();
   if(!text) return frag;
@@ -982,12 +1086,19 @@ function taggedRender(text){
       if(tail.trim()) frag.appendChild(mdRender(tail));
       break;
     }
+    const startIdx = i + open.index;
+    const tag = open[1];
+    if(HTML_TAG_DENY.has(tag.toLowerCase())){
+      const cutoff = startIdx + open[0].length;
+      const segment = text.slice(i, cutoff);
+      if(segment.trim()) frag.appendChild(mdRender(segment));
+      i = cutoff;
+      continue;
+    }
     if(open.index > 0){
       const before = text.slice(i, i + open.index);
       if(before.trim()) frag.appendChild(mdRender(before));
     }
-    const startIdx = i + open.index;
-    const tag = open[1];
     const openTag = `<${tag}>`;
     const closeTag = `</${tag}>`;
     let depth = 1;
@@ -1076,7 +1187,7 @@ const S = {
 function renderHeader(){
   const d = S.data;
   document.getElementById('stats').hidden = false;
-  document.getElementById('header-actions').hidden = false;
+  document.getElementById('btn-reload').hidden = false;
 
   let inT=0, outT=0, crT=0, cwT=0, cost=0;
   let firstTs=Infinity, lastTs=-Infinity;
@@ -1096,7 +1207,8 @@ function renderHeader(){
   }
   const span = isFinite(firstTs)&&isFinite(lastTs) ? fmt.duration(lastTs-firstTs) : '—';
 
-  document.getElementById('s-name').textContent = d.dirName;
+  const labelPrefix = d.projectLabel ? `${d.projectLabel} · ` : '';
+  document.getElementById('s-name').textContent = labelPrefix + d.dirName;
   document.getElementById('s-turns').innerHTML = d.turns.length;
   document.getElementById('s-in').innerHTML  = fmt.k(inT) + '<small>tk</small>';
   document.getElementById('s-out').innerHTML = fmt.k(outT) + '<small>tk</small>';
@@ -1104,6 +1216,14 @@ function renderHeader(){
   document.getElementById('s-cost').innerHTML = fmt.$(cost).replace('$','$<small>')+'</small>';
   document.getElementById('s-span').textContent = span;
   document.getElementById('side-name').textContent = d.dirName;
+  const sp = document.getElementById('side-project');
+  if(d.projectPath || d.projectLabel){
+    sp.hidden = false;
+    sp.innerHTML = `<b>${escHtml(d.projectLabel||'')}</b>${d.projectPath?escHtml(d.projectPath):''}`;
+  } else {
+    sp.hidden = true;
+    sp.textContent = '';
+  }
 }
 
 /* ───────────────── RENDER: SIDEBAR ───────────────── */
@@ -1518,17 +1638,25 @@ function pairTurns(reqs, resps){
   return turns;
 }
 
-async function fetchSessionData(name){
-  const u = encodeURIComponent(name);
+async function fetchSessionData(slug){
+  const u = encodeURIComponent(slug);
   const manifest = await (await fetch(`/api/sessions/${u}/files`)).json();
   const all = await Promise.all((manifest.files||[]).map(async f=>{
     const r = await fetch(`/api/sessions/${u}/file/${encodeURIComponent(f.name)}`);
     const body = await r.json();
-    return { name: f.name, path: f.name, kind: f.kind, ts: f.mtime*1000, body };
+    return { file: f.name, name: f.name, path: f.name, kind: f.kind, ts: f.mtime*1000, body };
   }));
   const reqs = all.filter(x=>x.kind==='request');
   const resps = all.filter(x=>x.kind==='response');
-  return { dirName: name, reqs, resps, turns: pairTurns(reqs, resps) };
+  const sessionName = manifest.session || slug;
+  const project = manifest.project || null;
+  const projectPath = manifest.projectPath || null;
+  const projectLabel = projectPath ? projectPath.split('/').filter(Boolean).pop() : (project || '');
+  return {
+    dirName: sessionName,
+    project, projectPath, projectLabel,
+    reqs, resps, turns: pairTurns(reqs, resps),
+  };
 }
 
 let _sse = null;
@@ -1571,39 +1699,77 @@ function renderSessionPicker(sessions){
   const empty = document.getElementById('empty');
   empty.classList.remove('hidden');
   document.getElementById('main').classList.add('hidden');
+  document.getElementById('btn-reload').hidden = true;
   history.replaceState(null,'','#');
+
+  // Group by project
+  const groups = new Map();
+  for(const s of sessions){
+    const key = s.project || '__none__';
+    if(!groups.has(key)){
+      groups.set(key, {
+        project: s.project || null,
+        projectPath: s.projectPath || null,
+        projectLabel: s.projectLabel || (s.project ? s.project : '(legacy)'),
+        sessions: [],
+      });
+    }
+    groups.get(key).sessions.push(s);
+  }
+  const groupArr = [...groups.values()].sort((a,b)=>{
+    const al = Math.max(...a.sessions.map(s=>s.last||0));
+    const bl = Math.max(...b.sessions.map(s=>s.last||0));
+    return bl - al;
+  });
+
+  const projectCount = groupArr.length;
+  const sessionCount = sessions.length;
+
   empty.innerHTML = `
     <div class="picker">
       <span class="corner tl"></span><span class="corner tr"></span>
       <span class="corner bl"></span><span class="corner br"></span>
       <div class="picker-eyebrow"><span class="live-dot"></span>CLAUDE-OTEL · LIVE</div>
-      <div class="picker-title">${sessions.length} session${sessions.length===1?'':'s'}</div>
+      <div class="picker-title">${sessionCount} session${sessionCount===1?'':'s'} · ${projectCount} project${projectCount===1?'':'s'}</div>
       <div class="picker-sub">click to inspect · live updates via SSE</div>
       <div class="picker-list" id="picker-list"></div>
     </div>`;
   const list = empty.querySelector('#picker-list');
-  if(!sessions.length){
+  if(!sessionCount){
     list.innerHTML = `<div class="picker-empty">no sessions yet — run <code>claude-otel record</code> to create one</div>`;
     return;
   }
-  for(const s of sessions){
-    const card = document.createElement('button');
-    card.className = 'picker-card';
-    card.innerHTML = `
-      <div>
-        <div class="pc-name">${escHtml(s.name)}</div>
-        <div class="pc-meta">
-          <span><span class="pc-num">${s.turns}</span><span class="pc-lab">turns</span></span>
-          <span><span class="pc-num">${fmt.k(s.size)}</span><span class="pc-lab">bytes</span></span>
-          <span><span class="pc-num">${s.files}</span><span class="pc-lab">files</span></span>
+
+  for(const g of groupArr){
+    const sec = document.createElement('div');
+    sec.className = 'picker-group';
+    const head = document.createElement('div');
+    head.className = 'picker-group-head';
+    head.innerHTML = `
+      <span class="pg-label">${escHtml(g.projectLabel)}</span>
+      <span class="pg-path">${escHtml(g.projectPath || g.project || '')}</span>
+      <span class="pg-count">${g.sessions.length} session${g.sessions.length===1?'':'s'}</span>`;
+    sec.appendChild(head);
+    for(const s of g.sessions){
+      const card = document.createElement('button');
+      card.className = 'picker-card';
+      card.innerHTML = `
+        <div>
+          <div class="pc-name">${escHtml(s.name)}</div>
+          <div class="pc-meta">
+            <span><span class="pc-num">${s.turns}</span><span class="pc-lab">turns</span></span>
+            <span><span class="pc-num">${fmt.k(s.size)}</span><span class="pc-lab">bytes</span></span>
+            <span><span class="pc-num">${s.files}</span><span class="pc-lab">files</span></span>
+          </div>
         </div>
-      </div>
-      <div class="pc-time">
-        <b>${fmt.time(s.last*1000)}</b>
-        <span>${fmt.date(s.last*1000)}</span>
-      </div>`;
-    card.addEventListener('click', ()=>loadServerSession(s.name));
-    list.appendChild(card);
+        <div class="pc-time">
+          <b>${fmt.time(s.last*1000)}</b>
+          <span>${fmt.date(s.last*1000)}</span>
+        </div>`;
+      card.addEventListener('click', ()=>loadServerSession(s.id));
+      sec.appendChild(card);
+    }
+    list.appendChild(sec);
   }
 }
 
@@ -1619,9 +1785,9 @@ async function bootServer(){
       reload.textContent = '◂ All sessions';
       reload.onclick = async ()=> renderSessionPicker(await refreshSessionList());
     }
-    const hashName = decodeURIComponent(location.hash.replace(/^#/,''));
-    const target = hashName && sessions.find(s=>s.name===hashName);
-    if(target) loadServerSession(target.name);
+    const hashId = decodeURIComponent(location.hash.replace(/^#/,''));
+    const target = hashId && sessions.find(s=>s.id===hashId || s.name===hashId);
+    if(target) loadServerSession(target.id);
     else renderSessionPicker(sessions);
   }catch(e){
     showError('server mode failed: ' + e.message);

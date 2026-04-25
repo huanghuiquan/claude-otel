@@ -12,7 +12,7 @@ import { spawn } from 'node:child_process';
 const PKG = 'claude-otel';
 const VERSION = '0.1.0';
 const DEFAULT_PORT = 47821;
-const DEFAULT_ROOT = '.claude-otel';
+const DEFAULT_ROOT = path.join(os.homedir(), '.claude', 'claude-otel');
 
 const HELP = `${PKG} v${VERSION}
 Local viewer for Claude Code's OpenTelemetry raw API bodies.
@@ -29,19 +29,26 @@ view options:
       --html <path>   override viewer.html location
 
 record options:
-      --root <dir>    log root          default: $PWD/${DEFAULT_ROOT}
+      --root <dir>    log root          default: ~/.claude/claude-otel
       --events        also stream OTel events to stderr
-all args after \`record\` are passed through to \`claude\`.
+      --cmd <bin>     program to spawn  default: claude  (e.g. ccr, mise exec claude)
+all args after \`record\` (and after the wrapper options) are passed through to the spawned program.
+
+layout:
+  Sessions are grouped by project (the cwd at \`record\` time):
+    <root>/<encoded-cwd>/<timestamp>/  ← raw .request.json / .response.json files
+  The encoded-cwd dir contains a .project file with the original path.
 
 env:
   CLAUDE_OTEL_ROOT, CLAUDE_OTEL_PORT, CLAUDE_OTEL_HOST  override defaults
 
 examples:
-  ${PKG}                              # serve $PWD/${DEFAULT_ROOT}
+  ${PKG}                              # serve ~/.claude/claude-otel
   ${PKG} ~/logs                       # serve a custom root
   ${PKG} --port 8000 --no-open
   ${PKG} record -p "hello"            # capture a one-shot session
   ${PKG} record --events -- -c        # pass --events to wrapper, then \`-c\` to claude
+  ${PKG} record --cmd ccr code        # capture a session launched via ccr
 `;
 
 // ─────────────── helpers ───────────────
@@ -77,6 +84,40 @@ function classify(name) {
   return 'other';
 }
 
+function encodeProject(cwd) {
+  return path.resolve(cwd).replace(/[\\/]/g, '-');
+}
+
+function readProjectPath(projectDir) {
+  try { return fs.readFileSync(path.join(projectDir, '.project'), 'utf8').trim() || null; }
+  catch { return null; }
+}
+
+function dirHasJsonFiles(dir) {
+  try {
+    for (const n of fs.readdirSync(dir)) {
+      if (n.endsWith('.json') && fs.statSync(path.join(dir, n)).isFile()) return true;
+    }
+  } catch { /* nope */ }
+  return false;
+}
+
+function parseSlug(slug) {
+  const idx = slug.indexOf(':');
+  if (idx < 0) return { project: null, session: slug };
+  return { project: slug.slice(0, idx), session: slug.slice(idx + 1) };
+}
+
+function resolveSessionDir(root, slug) {
+  const { project, session } = parseSlug(slug);
+  if (project) {
+    const projDir = safeJoin(root, project);
+    if (!projDir) return null;
+    return safeJoin(projDir, session);
+  }
+  return safeJoin(root, session);
+}
+
 function listFiles(dir) {
   const out = [];
   let entries;
@@ -92,30 +133,59 @@ function listFiles(dir) {
   return out;
 }
 
+function summarizeSessionDir(sessionDir, project, projectPath, sessionName) {
+  const files = listFiles(sessionDir);
+  if (!files.length) return null;
+  const reqs = files.filter(f => f.kind === 'request').length;
+  const resps = files.filter(f => f.kind === 'response').length;
+  if (!reqs && !resps) return null;
+  const mtimes = files.map(f => f.mtime);
+  const id = project ? `${project}:${sessionName}` : sessionName;
+  return {
+    id,
+    project,
+    projectPath,
+    projectLabel: projectPath ? path.basename(projectPath) : (project || ''),
+    name: sessionName,
+    turns: Math.max(reqs, resps),
+    requests: reqs,
+    responses: resps,
+    files: files.length,
+    first: Math.min(...mtimes),
+    last: Math.max(...mtimes),
+    size: files.reduce((s, f) => s + f.size, 0),
+  };
+}
+
 function listSessions(root) {
   if (!fs.existsSync(root)) return [];
   const out = [];
   for (const name of fs.readdirSync(root)) {
+    if (name.startsWith('.')) continue;
     const d = path.join(root, name);
     let st;
     try { st = fs.statSync(d); } catch { continue; }
     if (!st.isDirectory()) continue;
-    const files = listFiles(d);
-    if (!files.length) continue;
-    const reqs = files.filter(f => f.kind === 'request').length;
-    const resps = files.filter(f => f.kind === 'response').length;
-    if (!reqs && !resps) continue;
-    const mtimes = files.map(f => f.mtime);
-    out.push({
-      name,
-      turns: Math.max(reqs, resps),
-      requests: reqs,
-      responses: resps,
-      files: files.length,
-      first: Math.min(...mtimes),
-      last: Math.max(...mtimes),
-      size: files.reduce((s, f) => s + f.size, 0),
-    });
+
+    if (dirHasJsonFiles(d)) {
+      // legacy: session directly under root, no project layer
+      const sess = summarizeSessionDir(d, null, null, name);
+      if (sess) out.push(sess);
+      continue;
+    }
+    // project dir: scan one level deeper for sessions
+    const projectPath = readProjectPath(d);
+    let entries;
+    try { entries = fs.readdirSync(d); } catch { continue; }
+    for (const sName of entries) {
+      if (sName.startsWith('.')) continue;
+      const sDir = path.join(d, sName);
+      let sst;
+      try { sst = fs.statSync(sDir); } catch { continue; }
+      if (!sst.isDirectory()) continue;
+      const sess = summarizeSessionDir(sDir, name, projectPath, sName);
+      if (sess) out.push(sess);
+    }
   }
   out.sort((a, b) => b.last - a.last);
   return out;
@@ -143,12 +213,19 @@ function handle(req, res, ctx) {
 
   let m;
   if ((m = p.match(/^\/api\/sessions\/([^/]+)\/files$/))) {
-    const dir = safeJoin(ctx.root, decodeURIComponent(m[1]));
+    const slug = decodeURIComponent(m[1]);
+    const dir = resolveSessionDir(ctx.root, slug);
     if (!dir || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return sendJson(res, 404, { error: 'session not found' });
-    return sendJson(res, 200, { session: path.basename(dir), files: listFiles(dir) });
+    const { project } = parseSlug(slug);
+    let projectPath = null;
+    if (project) {
+      const projDir = safeJoin(ctx.root, project);
+      if (projDir) projectPath = readProjectPath(projDir);
+    }
+    return sendJson(res, 200, { session: path.basename(dir), project, projectPath, files: listFiles(dir) });
   }
   if ((m = p.match(/^\/api\/sessions\/([^/]+)\/file\/([^/]+)$/))) {
-    const dir = safeJoin(ctx.root, decodeURIComponent(m[1]));
+    const dir = resolveSessionDir(ctx.root, decodeURIComponent(m[1]));
     if (!dir) return sendJson(res, 404, { error: 'session not found' });
     const f = safeJoin(dir, decodeURIComponent(m[2]));
     if (!f || !fs.existsSync(f) || !fs.statSync(f).isFile()) return sendJson(res, 404, { error: 'file not found' });
@@ -160,7 +237,7 @@ function handle(req, res, ctx) {
     return fs.createReadStream(f).pipe(res);
   }
   if ((m = p.match(/^\/api\/sessions\/([^/]+)\/events$/))) {
-    const dir = safeJoin(ctx.root, decodeURIComponent(m[1]));
+    const dir = resolveSessionDir(ctx.root, decodeURIComponent(m[1]));
     if (!dir || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return sendJson(res, 404, { error: 'session not found' });
     return sseLoop(req, res, dir);
   }
@@ -212,13 +289,23 @@ function openInBrowser(url) {
 
 // ─────────────── commands ───────────────
 async function cmdView(opts, positional) {
-  const root = path.resolve(positional[0] || process.env.CLAUDE_OTEL_ROOT || DEFAULT_ROOT);
+  const explicit = positional[0] || process.env.CLAUDE_OTEL_ROOT;
+  const root = path.resolve(explicit || DEFAULT_ROOT);
   const port = +(opts.port || process.env.CLAUDE_OTEL_PORT || DEFAULT_PORT);
   const host = opts.host || process.env.CLAUDE_OTEL_HOST || '127.0.0.1';
 
-  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
-    console.error(`${PKG}: log root not found: ${root}`);
-    console.error(`  hint: run \`${PKG} record\` first to populate it.`);
+  if (!fs.existsSync(root)) {
+    if (!explicit) {
+      try { await fsp.mkdir(root, { recursive: true }); }
+      catch (e) { console.error(`${PKG}: cannot create ${root}: ${e.message}`); process.exit(1); }
+    } else {
+      console.error(`${PKG}: log root not found: ${root}`);
+      console.error(`  hint: run \`${PKG} record\` first to populate it.`);
+      process.exit(1);
+    }
+  }
+  if (!fs.statSync(root).isDirectory()) {
+    console.error(`${PKG}: log root is not a directory: ${root}`);
     process.exit(1);
   }
   const html = findViewerHtml(process.argv[1], opts.html);
@@ -244,9 +331,13 @@ async function cmdView(opts, positional) {
 
 async function cmdRecord(opts, claudeArgs) {
   const root = path.resolve(opts.root || process.env.CLAUDE_OTEL_ROOT || DEFAULT_ROOT);
+  const cwd = process.cwd();
+  const projectName = encodeProject(cwd);
+  const projectDir = path.join(root, projectName);
   const ts = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
-  const logDir = path.join(root, ts);
+  const logDir = path.join(projectDir, ts);
   await fsp.mkdir(logDir, { recursive: true });
+  try { await fsp.writeFile(path.join(projectDir, '.project'), cwd + '\n', { flag: 'w' }); } catch { /* ignore */ }
   process.stderr.write(`${PKG}: writing API bodies to ${logDir}\n`);
 
   const env = {
@@ -262,11 +353,12 @@ async function cmdRecord(opts, claudeArgs) {
     env.OTEL_LOGS_EXPORT_INTERVAL = '1000';
   }
 
-  const child = spawn('claude', claudeArgs, { stdio: 'inherit', env });
+  const bin = opts.cmd || 'claude';
+  const child = spawn(bin, claudeArgs, { stdio: 'inherit', env });
   child.on('exit', code => process.exit(code ?? 0));
   child.on('error', err => {
-    console.error(`${PKG}: failed to exec claude: ${err.message}`);
-    console.error('  hint: ensure `claude` is installed and on your $PATH.');
+    console.error(`${PKG}: failed to exec ${bin}: ${err.message}`);
+    console.error(`  hint: ensure \`${bin}\` is installed and on your $PATH.`);
     process.exit(1);
   });
 }
@@ -298,8 +390,9 @@ function parseRecordArgs(argv) {
     if (a === '--')                                  { i++; break; }
     else if (a === '--root')                         { opts.root = argv[++i]; i++; }
     else if (a === '--events')                       { opts.events = true; i++; }
+    else if (a === '--cmd')                          { opts.cmd = argv[++i]; i++; }
     else if (a === '--help')                         { console.log(HELP); process.exit(0); }
-    else                                             { break; }                    // first non-option → claude args
+    else                                             { break; }                    // first non-option → spawn args
   }
   for (; i < argv.length; i++) claudeArgs.push(argv[i]);
   return { opts, claudeArgs };
