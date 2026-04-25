@@ -121,6 +121,14 @@ The OTel hooks live inside the `claude` binary, so as long as `claude` is what e
                                   └──────────────────────┘
 ```
 
+## Tests
+
+```bash
+npm test
+```
+
+Covers the path-traversal & slug-resolution boundary (`safeJoin`, `parseSlug`, `resolveSessionDir`) plus session-listing layout detection. Run before any change to those helpers.
+
 ## Roadmap
 
 - [ ] Search across turns

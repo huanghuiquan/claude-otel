@@ -8,6 +8,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const PKG = 'claude-otel';
 const VERSION = '0.1.0';
@@ -117,6 +118,8 @@ function parseSlug(slug) {
 
 function resolveSessionDir(root, slug) {
   const { project, session } = parseSlug(slug);
+  // If a `/` was present, both halves must be non-empty.
+  if (project === '') return null;
   if (project) {
     const projDir = safeJoin(root, project);
     if (!projDir) return null;
@@ -450,5 +453,26 @@ function main() {
   return cmdView(opts, positional);
 }
 
-try { main(); }
-catch (err) { console.error(`${PKG}: ${err.message}`); process.exit(1); }
+// Run main() only when executed as a CLI, not when imported (e.g. by tests).
+function isCliEntry() {
+  if (!process.argv[1]) return false;
+  try {
+    return fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+  } catch { return false; }
+}
+
+if (isCliEntry()) {
+  try { main(); }
+  catch (err) { console.error(`${PKG}: ${err.message}`); process.exit(1); }
+}
+
+export {
+  encodeProject,
+  parseSlug,
+  resolveSessionDir,
+  safeJoin,
+  classify,
+  dirHasSessionFiles,
+  summarizeSessionDir,
+  listSessions,
+};
