@@ -1,13 +1,13 @@
-# scry
+# claude-otel
 
 Local viewer for [Claude Code](https://github.com/anthropics/claude-code)'s OpenTelemetry raw API bodies.
 
 Browse what your `claude` CLI actually sends and receives — full system prompts, tool calls, message history, token usage — in a calm, paginated UI.
 
 > [!NOTE]
-> **alpha** · macOS / Linux only · npm package name `claude-scry`, command `scry`.
+> **alpha** · macOS / Linux · single Node.js CLI, zero npm dependencies.
 
-## Why this exists
+## Why
 
 Claude Code v2.x ships as a native binary, which broke older interceptors like `claude-trace`. Anthropic's own answer is to dump full request/response JSONs via OpenTelemetry:
 
@@ -17,49 +17,51 @@ export OTEL_LOG_RAW_API_BODIES=file:./.claude-otel/$(date +%F-%H%M%S)
 claude
 ```
 
-`scry` reads those JSON files and renders them as a real conversation — markdown, tool calls, prior context, raw inspection — and serves it locally with live updates over SSE.
+`claude-otel` automates that capture and renders the resulting JSONs as a real conversation — markdown, tool calls, prior context, raw inspection — served locally with live updates over SSE.
 
 ## Install
 
 ```bash
-git clone https://github.com/USER/claude-scry ~/dev/scry
-cd ~/dev/scry
+# from npm (after publish)
+npm install -g claude-otel
+
+# from source
+git clone https://github.com/USER/claude-otel ~/dev/claude-otel
+cd ~/dev/claude-otel
 ./install.sh
 ```
 
-Symlinks `bin/scry` and `bin/claude-log` into `$BIN_DIR` (default `~/.local/bin`).
-Make sure that directory is on your `$PATH`.
+The installer symlinks `bin/claude-otel.mjs` to `$BIN_DIR/claude-otel` (default `~/.local/bin`). Make sure that directory is on your `$PATH`.
 
-Requirements:
-- Python 3.9+ (ships with macOS / Linux)
-- A reasonably modern browser (Chrome, Safari, Firefox)
+Requirements: **Node.js ≥ 18** + a modern browser. Zero npm dependencies.
 
 ## Usage
 
-### Capture a session
-
 ```bash
-claude-log                       # wraps `claude`, dumps raw bodies to ./.claude-otel/<timestamp>/
-CLAUDE_LOG_ROOT=~/logs claude-log # custom root
-CLAUDE_LOG_EVENTS=1 claude-log    # also stream OTel events to stderr
+claude-otel record              # wrap `claude`, dump raw bodies to ./.claude-otel/<timestamp>/
+claude-otel record -p "hello"   # one-shot capture
+claude-otel record --events     # also stream OTel events to stderr
+
+claude-otel                     # serve ./.claude-otel on http://127.0.0.1:47821
+claude-otel ~/logs              # serve a custom root
+claude-otel --port 8000         # custom port
+claude-otel --no-open           # don't open browser (useful over ssh)
+
+claude-otel --help              # full help
 ```
 
-`claude-log` is a thin wrapper that exports the right env vars and execs `claude`. All flags pass through.
+A browser tab opens to a session list. Click into one to see the full transcript. New turns from a running `claude-otel record` show up live (SSE polls the directory once per second).
 
-### Browse a session
+## Commands
 
-```bash
-scry                     # serve $PWD/.claude-otel on http://127.0.0.1:47821
-scry ~/logs              # custom root
-scry --port 8000         # custom port
-scry --no-open           # don't open browser (useful over ssh)
-```
-
-A browser tab opens to a session list. Click into one to see the full transcript. New turns from a running `claude-log` session show up live (SSE polls the directory once per second).
+| | what it does |
+|---|---|
+| `claude-otel` (or `claude-otel view`) | starts the local web viewer |
+| `claude-otel record [-- claude-args]` | execs `claude` with OTel raw-body logging enabled; all args after `record` are passed through |
 
 ## Data layout
 
-`scry` expects:
+`claude-otel` expects:
 
 ```
 <root>/
@@ -73,45 +75,44 @@ Exactly what `OTEL_LOG_RAW_API_BODIES=file:<dir>` produces.
 ## Features
 
 - **Markdown rendering** of assistant turns (code fences, headings, lists, links)
-- **XML tag parsing** of system reminders / `<EXTREMELY_IMPORTANT>` / `<example>` / etc., grouped and color-coded by category
-- **Prior-context block** on each turn, showing exactly which messages were sent in the request
+- **XML tag parsing** for system reminders / `<EXTREMELY_IMPORTANT>` / `<example>` / etc., grouped and color-coded
+- **Prior-context block** on each turn — see exactly which messages were sent in the request
 - **Token & cost counters** per turn (Opus / Sonnet / Haiku 4.x pricing approximations)
-- **Live updates** via Server-Sent Events while a Claude session is running
+- **Live updates** via Server-Sent Events while a session is running
 - **Path-traversal-safe** static file API
-- **Zero external dependencies** — Python stdlib only, single 300-line script
+- **Zero deps** — Node stdlib only, single ~330-line script
 
 ## Architecture
 
 ```
-┌────────────────────┐         ┌──────────────────────┐
-│ claude-log         │  writes │ .claude-otel/<ts>/    │
-│ (bash wrapper)     │────────▶│   *.request.json      │
-│ → exec claude      │         │   *.response.json     │
-└────────────────────┘         └──────────────────────┘
-                                          │ reads
-                                          ▼
-                              ┌──────────────────────┐
-                              │ scry (Python http)   │
-                              │  /api/sessions       │
-                              │  /api/.../files      │
-                              │  /api/.../file/{n}   │
-                              │  /api/.../events SSE │
-                              │  /          → HTML   │
-                              └──────────────────────┘
-                                          │
-                                          ▼
-                              ┌──────────────────────┐
-                              │ viewer.html          │
-                              │ (single-file SPA)    │
-                              └──────────────────────┘
+┌────────────────────────┐  writes   ┌──────────────────────┐
+│ claude-otel record     │──────────▶│ .claude-otel/<ts>/    │
+│ (spawns `claude` with   │           │   *.request.json      │
+│  OTEL_LOG_RAW_API_…)    │           │   *.response.json     │
+└────────────────────────┘           └──────────────────────┘
+                                              │ reads
+                                              ▼
+                                  ┌──────────────────────┐
+                                  │ claude-otel (Node)   │
+                                  │  /                   │
+                                  │  /api/sessions       │
+                                  │  /api/.../files      │
+                                  │  /api/.../file/{n}   │
+                                  │  /api/.../events SSE │
+                                  └──────────────────────┘
+                                              │
+                                              ▼
+                                  ┌──────────────────────┐
+                                  │ viewer.html          │
+                                  │ (single-file SPA)    │
+                                  └──────────────────────┘
 ```
 
 ## Roadmap
 
-- [ ] Node wrapper for `npm publish` (current bin is Python)
 - [ ] Search across turns
 - [ ] Diff view between adjacent prior-context snapshots
-- [ ] Export turn as standalone markdown / Anthropic API replay request
+- [ ] Export turn as standalone markdown / replayable API request
 - [ ] Windows support
 
 ## License

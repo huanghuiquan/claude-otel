@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scry · install — symlink CLIs into $BIN_DIR (default ~/.local/bin)
+# claude-otel · install — symlink CLI into $BIN_DIR (default ~/.local/bin)
 
 set -euo pipefail
 
@@ -11,7 +11,7 @@ mkdir -p "$BIN_DIR"
 link() {
   local src="$1" dst="$2"
   if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then
-    printf '  · %s\n' "$dst (already linked)"
+    printf '  · %s (already linked)\n' "$dst"
     return
   fi
   if [ -e "$dst" ] || [ -L "$dst" ]; then
@@ -24,9 +24,8 @@ link() {
   printf '  → %s\n' "$dst"
 }
 
-echo "scry · linking CLIs into $BIN_DIR"
-link "$ROOT/bin/scry"       "$BIN_DIR/scry"
-link "$ROOT/bin/claude-log" "$BIN_DIR/claude-log"
+echo "claude-otel · linking CLI into $BIN_DIR"
+link "$ROOT/bin/claude-otel.mjs" "$BIN_DIR/claude-otel"
 
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
@@ -44,5 +43,5 @@ esac
 
 echo
 echo "done. try:"
-echo "    claude-log -p 'hello'    # capture a one-shot session"
-echo "    scry                     # browse it"
+echo "    claude-otel record -p 'hello'   # capture a one-shot session"
+echo "    claude-otel                     # serve the viewer"

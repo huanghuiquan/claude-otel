@@ -740,7 +740,7 @@
       <span class="corner tl"></span><span class="corner tr"></span>
       <span class="corner bl"></span><span class="corner br"></span>
 
-      <div class="drop-eyebrow">CLAUDE · TRACE · v1</div>
+      <div class="drop-eyebrow">CLAUDE-OTEL · v1</div>
       <div class="drop-title">Show me the<br><span class="num">conversation</span><br>underneath.</div>
       <div class="drop-sub">
         Point at a folder of <code>.request.json</code> / <code>.response.json</code>
@@ -1576,14 +1576,14 @@ function renderSessionPicker(sessions){
     <div class="picker">
       <span class="corner tl"></span><span class="corner tr"></span>
       <span class="corner bl"></span><span class="corner br"></span>
-      <div class="picker-eyebrow"><span class="live-dot"></span>SCRY · LIVE</div>
+      <div class="picker-eyebrow"><span class="live-dot"></span>CLAUDE-OTEL · LIVE</div>
       <div class="picker-title">${sessions.length} session${sessions.length===1?'':'s'}</div>
       <div class="picker-sub">click to inspect · live updates via SSE</div>
       <div class="picker-list" id="picker-list"></div>
     </div>`;
   const list = empty.querySelector('#picker-list');
   if(!sessions.length){
-    list.innerHTML = `<div class="picker-empty">no sessions yet — run <code>claude-log</code> to create one</div>`;
+    list.innerHTML = `<div class="picker-empty">no sessions yet — run <code>claude-otel record</code> to create one</div>`;
     return;
   }
   for(const s of sessions){
