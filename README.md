@@ -1,5 +1,7 @@
 # claude-otel
 
+English · [简体中文](README.zh-CN.md)
+
 Local viewer for [Claude Code](https://github.com/anthropics/claude-code)'s OpenTelemetry raw API bodies.
 
 Browse what your `claude` CLI actually sends and receives — full system prompts, tool calls, message history, token usage — in a calm, paginated UI.
